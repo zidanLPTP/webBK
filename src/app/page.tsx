@@ -1,42 +1,41 @@
 "use client";
 
+import AvatarSelector from "@/components/AvatarSelector";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { 
-  MessageCircle, MapPin, Plus, User, 
-  Home, Hash, TrendingUp, Heart 
-} from "lucide-react";
-
-type LaporanView = {
-  idLaporan: string;
-  deskripsi: string;
-  lokasi: string;
-  kategori: string;
-  foto: string | null;
-  pelaporId: string;
-  jumlahKomentar: number;
-  jumlahLikes: number;
-  isLikedByMe?: boolean; 
-};
-
-type TrendingTopic = {
-  kategori: string;
-  count: number;
-};
+import { User, Search, PenSquare, Loader2 } from "lucide-react";
+import SidebarLeft from "@/components/SidebarLeft";
+import SidebarRight from "@/components/SidebarRight";
+import MenfessCard from "@/components/MenfessCard";
+import LandingPage from "@/components/LandingPage";
+import toast from "react-hot-toast";
+import { useRouter } from "next/navigation"; 
 
 export default function HomePage() {
-  const [laporanList, setLaporanList] = useState<LaporanView[]>([]);
-  const [trendingList, setTrendingList] = useState<TrendingTopic[]>([]); // DATA TRENDING ASLI
+  const router = useRouter();
+  const [showLanding, setShowLanding] = useState(true);
+  const [laporanList, setLaporanList] = useState<any[]>([]);
+  const [trendingList, setTrendingList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAvatarOpen, setIsAvatarOpen] = useState(false);
+  const [myAvatar, setMyAvatar] = useState("🐱"); 
 
-  // FETCH DATA
+  // --- FETCH DATA ---
   useEffect(() => {
+    const hasVisited = sessionStorage.getItem("has_visited_bisikkampus");
+    if (hasVisited) {
+      setShowLanding(false);
+    }
+
     const fetchData = async () => {
       try {
-        const resFeed = await fetch("/api/laporan");
+        const [resFeed, resTrend] = await Promise.all([
+          fetch("/api/laporan"),
+          fetch("/api/trending")
+        ]);
+        
         const jsonFeed = await resFeed.json();
-        const resTrend = await fetch("/api/trending");
         const jsonTrend = await resTrend.json();
 
         if (jsonFeed.success) setLaporanList(jsonFeed.data);
@@ -46,21 +45,43 @@ export default function HomePage() {
       }
     };
     fetchData();
+    const savedAvatar = localStorage.getItem("bisik_avatar");
+    if (savedAvatar) setMyAvatar(savedAvatar);
   }, []);
 
-  // FUNCTION HANDLE LIKE
+  const handleNavbarSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const query = e.currentTarget.value;
+      if (query.trim()) {
+        router.push(`/explore?q=${encodeURIComponent(query)}`);
+      }
+    }
+  };
+
+  const handleAvatarChange = (newAvatar: string) => {
+    setMyAvatar(newAvatar);
+    localStorage.setItem("bisik_avatar", newAvatar);
+    setIsAvatarOpen(false); 
+    toast.success("Identitas baru dipilih!");
+  };
+
+  const handleStart = () => {
+    sessionStorage.setItem("has_visited_bisikkampus", "true");
+    setShowLanding(false);
+  };
+
+  // --- HANDLE LIKE ---
   const handleLike = async (id: string) => {
     const guestId = localStorage.getItem("bisik_guest_id");
     if (!guestId) return;
 
-    // Optimistic UI Update 
     setLaporanList(prev => prev.map(post => {
       if (post.idLaporan === id) {
-        const isCurrentlyLiked = post.isLikedByMe;
+        const liked = post.isLikedByMe;
         return {
           ...post,
-          isLikedByMe: !isCurrentlyLiked,
-          jumlahLikes: isCurrentlyLiked ? post.jumlahLikes - 1 : post.jumlahLikes + 1
+          isLikedByMe: !liked,
+          jumlahLikes: liked ? post.jumlahLikes - 1 : post.jumlahLikes + 1
         };
       }
       return post;
@@ -73,149 +94,141 @@ export default function HomePage() {
     });
   };
 
-  const formatGuestName = (uuid: string) => "guest" + (uuid ? uuid.substring(0, 3) : "???");
-
-  const SidebarRight = () => (
-    <div className="space-y-6">
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 sticky top-24">
-        <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-[#5D3891]" /> Trending (Real-Time)
-        </h3>
-        <div className="space-y-4">
-          {/* MAP DATA TRENDING ASLI */}
-          {trendingList.length === 0 ? (
-            <p className="text-xs text-gray-400 italic">Belum ada data trending.</p>
-          ) : (
-            trendingList.map((topic, idx) => (
-              <div key={topic.kategori} className="flex justify-between items-center group cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition">
-                <div>
-                  <p className="text-xs text-gray-400">#{idx + 1} Trending</p>
-                  <p className="font-bold text-gray-800 text-sm">{topic.kategori}</p>
-                </div>
-                <span className="bg-purple-100 text-[#5D3891] text-xs font-bold px-2 py-1 rounded-full">
-                  {topic.count} Posts
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
+  if (showLanding) {
+    return <LandingPage onStart={handleStart} />;
+  }
+  
   return (
-    <div className="min-h-screen bg-[#F0F2F5] font-sans pb-24">
-      {/* Navbar sama seperti sebelumnya... */}
-      <div className="bg-white px-4 md:px-8 py-3 flex justify-between items-center shadow-sm sticky top-0 z-50">
-        <div className="flex items-center gap-2">
-           <Image src="/logo-kucing.png" alt="Logo" width={36} height={36} />
-           <span className="font-extrabold text-xl text-[#5D3891] tracking-tight hidden md:block">BisikKampus</span>
+    <div className="min-h-screen bg-[#F0F2F5] dark:bg-gray-900 font-sans pb-24">
+      
+      {/* 1. NAVBAR FIXED */}
+      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md px-4 md:px-8 py-3 flex justify-between items-center shadow-sm sticky top-0 z-40 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-3">
+           <Image src="/logo-kucing.png" alt="Logo" width={38} height={38} />
+           <span className="font-extrabold text-xl bg-gradient-to-r from-[#5D3891] to-purple-500 bg-clip-text text-transparent tracking-tight hidden md:block">
+             BisikKampus
+           </span>
         </div>
         
-        <div className="flex items-center gap-3">
-             {/* Tombol Buat Laporan di Navbar */}
-            <Link href="/buat-laporan" className="hidden md:flex items-center gap-2 bg-[#5D3891] text-white px-5 py-2 rounded-full font-bold text-sm hover:bg-[#4a2c75] transition">
-                <Plus className="w-4 h-4" /> Buat Menfess
-            </Link>
-            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center cursor-pointer hover:bg-gray-300 transition">
-                <User className="w-5 h-5 text-gray-600" />
+        <div className="hidden md:block flex-1 max-w-lg mx-8 relative">
+            <div className="absolute left-4 top-2.5 text-gray-400">
+              <Search className="w-5 h-5" />
             </div>
+            <input 
+              type="text" 
+              placeholder="Cari menfess, topik, atau jurusan..." 
+              className="bg-gray-100 dark:bg-gray-700 rounded-full px-12 py-2.5 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#5D3891] dark:text-white transition-all" 
+              onKeyDown={handleNavbarSearch} // <--- TAMBAHKAN INI
+            />
+        </div>
+
+        <div className="flex items-center gap-3">
+            <Link href="/buat-laporan" className="hidden md:flex items-center gap-2 bg-[#5D3891] text-white px-5 py-2.5 rounded-full font-bold text-sm hover:bg-[#4a2c75] hover:shadow-lg hover:scale-105 transition-all">
+                <PenSquare className="w-4 h-4" /> Buat Menfess
+            </Link>
+            
+            {/* BUTTON AVATAR DI NAVBAR JUGA HARUS BISA DIKLIK */}
+            <button 
+               onClick={() => setIsAvatarOpen(true)}
+               className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center cursor-pointer border border-white dark:border-gray-600 shadow-sm hover:scale-105 transition"
+            >
+               {myAvatar}
+            </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto pt-6 px-4 md:px-8 grid grid-cols-1 md:grid-cols-4 lg:grid-cols-4 gap-6">
+      {/* 2. MAIN LAYOUT (GRID) */}
+      <div className="max-w-7xl mx-auto pt-6 px-4 md:px-6 grid grid-cols-1 md:grid-cols-4 lg:grid-cols-4 gap-8">
         
-        {/* KOLOM KIRI (Menu) */}
-        <div className="hidden md:block md:col-span-1 sticky top-24 h-fit">
-            {/* ... SidebarLeft Code dari jawaban sebelumnya ... */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Menu Utama</h3>
-                <ul className="space-y-2">
-                    <li><Link href="/" className="flex items-center gap-3 text-[#5D3891] font-bold bg-purple-50 px-4 py-3 rounded-xl transition"><Home className="w-5 h-5" />Beranda</Link></li>
-                    <li><a href="#" className="flex items-center gap-3 text-gray-600 hover:bg-gray-50 px-4 py-3 rounded-xl transition font-medium"><Hash className="w-5 h-5" />Explore</a></li>
-                </ul>
-            </div>
+        {/* KOLOM KIRI */}
+        <div className="hidden md:block md:col-span-1 h-fit">
+            <SidebarLeft />
         </div>
 
-        {/* KOLOM TENGAH (Feed) */}
-        <div className="col-span-1 md:col-span-3 lg:col-span-2 space-y-5">
-            {/* Input Trigger */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                    <User className="w-5 h-5 text-gray-500" />
-                </div>
-                <Link href="/buat-laporan" className="flex-1 bg-gray-100 hover:bg-gray-200 transition rounded-full px-5 py-3 text-left text-gray-500 text-sm cursor-pointer">
-                    Apa yang sedang kamu pikirkan, Guest?
-                </Link>
-            </div>
+        {/* KOLOM TENGAH */}
+        <div className="col-span-1 md:col-span-3 lg:col-span-2 space-y-6">
+            
+            {/* 3. INPUT TRIGGER (PERBAIKAN UTAMA) */}
+            {/* Hapus onClick dari div pembungkus utama */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-4 group">
+                
+                {/* Tombol Avatar: Hanya buka modal */}
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation(); // Mencegah klik tembus
+                    setIsAvatarOpen(true);
+                  }}
+                  className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center cursor-pointer border border-transparent hover:border-purple-300 dark:hover:border-purple-500 transition-all shadow-sm text-lg z-10"
+                >
+                    {myAvatar}
+                </button>
 
-            {loading && <div className="text-center py-10">Memuat...</div>}
-
-            {laporanList.map((laporan) => (
-            <div key={laporan.idLaporan} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300">
-                <Link href={`/laporan/${laporan.idLaporan}`} className="block">
-                    {/* Header Card (Sama seperti sebelumnya) */}
-                    <div className="flex justify-between items-start mb-3">
-                        <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white ${laporan.kategori === 'Horor' ? 'bg-purple-900' : 'bg-[#5D3891]'}`}>
-                                {laporan.pelaporId.substring(0,2).toUpperCase()}
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-gray-900 text-sm">{formatGuestName(laporan.pelaporId)}</h3>
-                                <div className="flex items-center text-xs text-gray-400 mt-0.5">
-                                    <MapPin className="w-3 h-3 mr-1" /> {laporan.lokasi || "Public"}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="pl-[52px]">
-                        <p className="text-gray-800 text-[15px] leading-relaxed mb-3 whitespace-pre-wrap">{laporan.deskripsi}</p>
-                        {laporan.foto && (
-                            <div className="mb-4 rounded-xl overflow-hidden border border-gray-100">
-                                <img src={laporan.foto} className="w-full h-auto max-h-[500px] object-cover" />
-                            </div>
-                        )}
-                    </div>
-                </Link>
-
-                {/* Footer Actions (LIKE BERFUNGSI) */}
-                <div className="pl-[52px] flex items-center gap-6 mt-4 pt-3 border-t border-gray-50">
-                    <button 
-                        onClick={(e) => { e.preventDefault(); handleLike(laporan.idLaporan); }}
-                        className={`flex items-center gap-2 transition group ${laporan.isLikedByMe ? 'text-pink-500' : 'text-gray-500 hover:text-pink-500'}`}
-                    >
-                        <div className={`p-2 rounded-full group-hover:bg-pink-50 ${laporan.isLikedByMe ? 'bg-pink-50' : ''}`}>
-                            <Heart className={`w-5 h-5 ${laporan.isLikedByMe ? 'fill-pink-500' : ''}`} />
-                        </div>
-                        <span className="text-sm font-medium">{laporan.jumlahLikes} Suka</span>
-                    </button>
-
-                    <Link href={`/laporan/${laporan.idLaporan}`} className="flex items-center gap-2 text-gray-500 hover:text-[#5D3891] transition cursor-pointer group">
-                        <div className="p-2 rounded-full group-hover:bg-purple-50">
-                            <MessageCircle className="w-5 h-5" />
-                        </div>
-                        <span className="text-sm font-medium">{laporan.jumlahKomentar} Komentar</span>
-                    </Link>
+                {/* Input Teks Palsu: Hanya ini yang navigasi ke Buat Laporan */}
+                <div 
+                  onClick={() => router.push('/buat-laporan')} 
+                  className="flex-1 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition rounded-full px-5 py-3 text-left text-gray-500 dark:text-gray-400 text-sm cursor-text"
+                >
+                    Kirim menfess rahasia di sini...
                 </div>
             </div>
+
+            {/* Skeleton Loading */}
+            {loading && Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="bg-white dark:bg-gray-800 rounded-2xl p-6 h-48 animate-pulse border border-gray-100 dark:border-gray-700">
+                  <div className="flex gap-3">
+                    <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                    <div className="flex-1 space-y-2 py-1">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                    </div>
+                  </div>
+                  <div className="space-y-2 mt-4 pl-14">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
+                  </div>
+                </div>
             ))}
+
+            {/* Empty State */}
+            {!loading && laporanList.length === 0 && (
+                <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
+                    <div className="text-6xl mb-4">👻</div>
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white">Sepi banget...</h3>
+                    <p className="text-gray-500 mb-6">Belum ada yang berani speak up.</p>
+                    <Link href="/buat-laporan" className="text-[#5D3891] font-bold underline">Jadilah yang pertama!</Link>
+                </div>
+            )}
+
+            {/* Feed Loop */}
+            {laporanList.map((laporan) => (
+               <MenfessCard 
+                 key={laporan.idLaporan} 
+                 data={laporan} 
+                 onLike={handleLike} 
+               />
+            ))}
+            
+            {!loading && laporanList.length > 0 && (
+              <div className="flex justify-center py-8">
+                 <Loader2 className="w-6 h-6 text-[#5D3891] animate-spin" />
+              </div>
+            )}
         </div>
 
-        {/* KOLOM KANAN (Real Trending) */}
-        <div className="hidden lg:block lg:col-span-1 sticky top-24 h-fit">
-            <SidebarRight />
+        {/* KOLOM KANAN */}
+        <div className="hidden lg:block lg:col-span-1 h-fit">
+            <SidebarRight trendingList={trendingList} />
         </div>
+
       </div>
       
-      {/* FAB Mobile */}
-      <Link href="/buat-laporan" className="md:hidden">
-        <div className="fixed bottom-6 right-6 z-50">
-          <div className="relative w-14 h-14 bg-[#5D3891] rounded-full flex items-center justify-center text-white shadow-xl">
-            <Plus className="w-7 h-7" />
-          </div>
-        </div>
-      </Link>
+      {/* Modal Avatar */}
+      <AvatarSelector 
+        isOpen={isAvatarOpen}
+        onClose={() => setIsAvatarOpen(false)}
+        currentAvatar={myAvatar}
+        onSelect={handleAvatarChange}
+      />
     </div>
   );
 }

@@ -1,27 +1,21 @@
 import { NextResponse } from "next/server";
 import { CreateLaporanUseCase } from "@/core/usecases/CreateLaporanUseCase";
+import { GetPublicLaporanUseCase } from "@/core/usecases/GetPublicLaporanUseCase"; // Asumsi ada UseCase ini atau langsung repo
 import { PrismaLaporanRepository } from "@/infrastructure/repositories/PrismaLaporanRepository";
 import { PrismaPelaporRepository } from "@/infrastructure/repositories/PrismaPelaporRepository";
-import { GetPublicLaporanUseCase } from "@/core/usecases/GetPublicLaporanUseCase";
 
-// Database -> Repository -> Use Case -> Controller
+// Dependency Injection Setup
 const laporanRepo = new PrismaLaporanRepository();
 const pelaporRepo = new PrismaPelaporRepository();
 const createLaporanUseCase = new CreateLaporanUseCase(laporanRepo, pelaporRepo);
-const getPublicLaporanUseCase = new GetPublicLaporanUseCase(laporanRepo);
 
-// Method POST: Untuk menerima kiriman data laporan baru
 export async function POST(request: Request) {
   try {
     const body = await request.json();
- 
     const deviceId = request.headers.get("x-device-id");
 
     if (!deviceId) {
-      return NextResponse.json(
-        { error: "Device ID tidak ditemukan (Anda dianggap bot)." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Device ID tidak ditemukan" }, { status: 400 });
     }
 
     const laporanBaru = await createLaporanUseCase.execute({
@@ -29,38 +23,33 @@ export async function POST(request: Request) {
       deskripsi: body.deskripsi,
       kategori: body.kategori,
       lokasi: body.lokasi,
-      foto: body.foto || null, 
-      deviceId: deviceId,     
+      foto: body.foto || null,
+      deviceId: deviceId,
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Laporan berhasil dikirim dan menunggu moderasi.",
-      data: laporanBaru,
-    }, { status: 201 }); 
-
+    return NextResponse.json({ success: true, data: laporanBaru }, { status: 201 });
   } catch (error: any) {
     console.error("API Error:", error);
-
-    const errorMessage = error.message || "Terjadi kesalahan internal server.";
-
-    return NextResponse.json({
-      success: false,
-      error: errorMessage
-    }, { status: 400 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
   }
 }
 
-// Method GET: Untuk mengambil daftar laporan
-export async function GET() {
-  const laporanRepo = new PrismaLaporanRepository();
-  const getUseCase = new GetPublicLaporanUseCase(laporanRepo);
+// UPDATE BAGIAN GET INI:
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const kategori = searchParams.get("kategori"); // Ambil param kategori
 
-  const data = await getUseCase.execute();
+  let data;
+  if (kategori) {
+    // Jika ada kategori, filter!
+    data = await laporanRepo.getByCategory(kategori);
+  } else {
+    // Jika tidak ada, ambil semua public
+    data = await laporanRepo.getAllPublic();
+  }
 
   return NextResponse.json({
     success: true,
     data: data
   });
 }
-
