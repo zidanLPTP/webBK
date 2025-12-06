@@ -140,7 +140,7 @@ export default function AdminLoginPage() {
           {/* Footer */}
           <div className="mt-8 text-center">
             <p className="text-xs text-gray-600">
-              Lupa password? Hubungi tim IT atau <span className="text-purple-400 hover:text-purple-300 cursor-pointer underline decoration-dotted">reset di database</span>.
+              Lupa password? Mampus ngapain kau disini
             </p>
           </div>
 

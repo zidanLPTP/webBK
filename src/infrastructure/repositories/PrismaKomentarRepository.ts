@@ -11,7 +11,7 @@ export class PrismaKomentarRepository implements IKomentarRepository {
         isi: k.isiKomentar,
         laporanId: k.laporanId,
         pelaporId: k.pelaporId,
-        parentId: k.parentId, 
+        parentId: k.parentId,
         createdAt: k.tanggal
       }
     });
@@ -20,24 +20,34 @@ export class PrismaKomentarRepository implements IKomentarRepository {
   async getByLaporanId(laporanId: string): Promise<Komentar[]> {
     const raw = await db.komentar.findMany({
       where: { laporanId: laporanId },
-      orderBy: { createdAt: 'asc' }, 
+      orderBy: { createdAt: 'asc' },
       include: { pelapor: true }
     });
 
     return raw.map(r => new Komentar(
-      r.id,
-      r.isi,
-      r.createdAt,
-      r.laporanId,
-      r.pelaporId,
-      r.parentId,
-      "guest" + r.pelapor.deviceId.substring(0, 3) 
+      r.id, r.isi, r.createdAt, r.laporanId, r.pelaporId, r.parentId,
+      "guest" + r.pelapor.deviceId.substring(0, 3)
     ));
   }
 
   async delete(id: string): Promise<void> {
-    await db.komentar.delete({
-      where: { id: id }
+    await db.komentar.delete({ where: { id: id } });
+  }
+
+  async findById(id: string): Promise<Komentar | null> {
+    const data = await db.komentar.findUnique({
+      where: { id },
+      include: { pelapor: true } 
     });
+
+    if (!data) return null;
+
+    const k = new Komentar(
+      data.id, data.isi, data.createdAt, data.laporanId, data.pelaporId, data.parentId
+    );
+    
+    (k as any).authorDeviceId = data.pelapor.deviceId; 
+    
+    return k;
   }
 }

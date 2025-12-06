@@ -38,7 +38,6 @@ export default function BuatMenfessPage() {
   const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
-    // 1. Setup ID
     let id = localStorage.getItem("bisik_guest_id");
     if (!id) {
       id = crypto.randomUUID();

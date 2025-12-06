@@ -34,16 +34,8 @@ export default function AdminDashboard() {
   const [selectedLaporan, setSelectedLaporan] = useState<LaporanView | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("bisik_admin_token");
-    const name = localStorage.getItem("bisik_admin_name");
-
-    if (!token) {
-      router.push("/admin/login");
-    } else {
-      setAdminName(name || "Admin");
-      fetchData(activeTab);
-    }
-  }, [activeTab]);
+    fetchData("Pending");
+  }, []);
 
   const fetchData = async (tab: string) => {
     setIsLoading(true);
@@ -52,8 +44,16 @@ export default function AdminDashboard() {
     
     try {
       const res = await fetch(`/api/admin/laporan?status=${dbStatus}`);
+      
+      if (res.status === 401) {
+        router.push("/admin/login");
+        return;
+      }
+
       const json = await res.json();
-      if (json.success) setLaporanList(json.data);
+      if (json.success) {
+        setLaporanList(json.data);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -78,8 +78,8 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("bisik_admin_token");
+  const handleLogout = async () => {
+    await fetch("/api/admin/logout", { method: "POST" });
     router.push("/admin/login");
   };
 

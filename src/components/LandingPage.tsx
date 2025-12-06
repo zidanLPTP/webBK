@@ -32,7 +32,7 @@ export default function LandingPage({ onStart }: { onStart: () => void }) {
           BisikKampus
         </h1>
         <p className="text-gray-400 text-lg mb-10 leading-relaxed">
-          Satu tempat untuk semua rahasia, cerita, dan keluh kesah kampusmu. <br/>
+          Satu tempat berjuta ceritaa anjayy kelas ga sih (ubah nanti). <br/>
           <span className="text-purple-400 font-semibold">100% Anonim.</span>
         </p>
 
@@ -48,10 +48,6 @@ export default function LandingPage({ onStart }: { onStart: () => void }) {
           <Sparkles className="absolute -top-3 -right-3 w-6 h-6 text-yellow-400 animate-bounce" />
         </button>
 
-        {/* Footer Text */}
-        <p className="absolute bottom-8 text-xs text-gray-600 uppercase tracking-widest">
-          Bergabung dengan Komunitas
-        </p>
       </div>
 
     </div>
