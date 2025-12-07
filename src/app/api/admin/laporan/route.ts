@@ -4,6 +4,9 @@ import { StatusLaporan } from "@/core/entities/Laporan";
 import { getSession } from "@/lib/auth"; // Import Session Checker
 import { z } from "zod";
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0
+
 // Schema Validasi PATCH
 const patchSchema = z.object({
   id: z.string().uuid(),

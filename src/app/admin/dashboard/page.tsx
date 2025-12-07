@@ -44,7 +44,14 @@ export default function AdminDashboard() {
     if (tab === "Ditolak") dbStatus = "Ditolak";
     
     try {
-      const res = await fetch(`/api/admin/laporan?status=${dbStatus}`);
+      const res = await fetch(`/api/admin/laporan?status=${dbStatus}`, {
+        cache: 'no-store',
+        headers: {
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      
       const json = await res.json();
       if (json.success) setLaporanList(json.data);
       else setLaporanList([]); 
