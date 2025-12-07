@@ -16,7 +16,7 @@ async function main() {
       role: 'superadmin'
     },
   })
-  console.log("✅ Akun admin berhasil dibuat. User: admin, Pass: adminGaul69Like")
+  console.log("Akun admin berhasil dibuat. User: admin, Pass: adminGaul69Like")
 }
 
 main()
