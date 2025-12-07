@@ -1,72 +1,64 @@
 import { NextResponse } from "next/server";
+import {prisma} from "@/lib/prisma"; 
+import { CreateLaporanUseCase } from "@/core/usecases/CreateLaporanUseCase";
 import { PrismaLaporanRepository } from "@/infrastructure/repositories/PrismaLaporanRepository";
-import { StatusLaporan } from "@/core/entities/Laporan";
-import { getSession } from "@/lib/auth"; // Import Session Checker
-import { z } from "zod";
+import { PrismaPelaporRepository } from "@/infrastructure/repositories/PrismaPelaporRepository";
 
+// SETUP REPO (Untuk POST/Input Laporan)
+const laporanRepo = new PrismaLaporanRepository();
+const pelaporRepo = new PrismaPelaporRepository();
+const createLaporanUseCase = new CreateLaporanUseCase(laporanRepo, pelaporRepo);
+
+// 1. WAJIB: Paksa Dinamis (Biar gak kena cache foto lama)
 export const dynamic = 'force-dynamic';
-export const revalidate = 0
+export const revalidate = 0;
 
-// Schema Validasi PATCH
-const patchSchema = z.object({
-  id: z.string().uuid(),
-  status: z.enum(['Pending', 'Ditanggapi', 'Selesai', 'Ditolak']),
-});
-
-// Middleware-like function untuk cek admin
-async function checkAdmin() {
-  const session = await getSession();
-  if (!session || session.role !== "superadmin") { // Sesuaikan role di DB
-    return false;
-  }
-  return true;
-}
-
-export async function GET(request: Request) {
-  // 1. CEK TOKEN/COOKIE
-  if (!await checkAdmin()) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const status = searchParams.get("status") as StatusLaporan;
-
-  // Validasi Query Param sederhana
-  const validStatuses = ['Pending', 'Ditanggapi', 'Selesai', 'Ditolak'];
-  if (!status || !validStatuses.includes(status)) {
-    return NextResponse.json({ success: false, error: "Status invalid" }, { status: 400 });
-  }
-
-  const repo = new PrismaLaporanRepository();
-  const data = await repo.getByStatus(status);
-
-  return NextResponse.json({ success: true, data });
-}
-
-export async function PATCH(request: Request) {
-  // 1. CEK TOKEN
-  if (!await checkAdmin()) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+// HANDLE POST (Tetap sama, untuk buat laporan)
+export async function POST(request: Request) {
   try {
     const body = await request.json();
-    
-    // 2. VALIDASI INPUT (ZOD) - Fix saranmu
-    const { id, status } = patchSchema.parse(body);
+    const deviceId = request.headers.get("x-device-id");
 
-    const repo = new PrismaLaporanRepository();
-    await repo.updateStatus(id, status as StatusLaporan);
-
-    // TODO: Tambahkan Audit Log disini (misal: Admin X mengubah Laporan Y jadi Z)
-    console.log(`AUDIT: Admin changed Report ${id} to ${status}`);
-
-    return NextResponse.json({ success: true, message: "Status berhasil diubah" });
-  } catch (error: any) {
-    // 3. SECURE ERROR HANDLING
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ success: false, error: error.issues }, { status: 400 });
+    if (!deviceId) {
+      return NextResponse.json({ error: "Device ID tidak ditemukan" }, { status: 400 });
     }
-    return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
+
+    const laporanBaru = await createLaporanUseCase.execute({
+      judul: body.judul,
+      deskripsi: body.deskripsi,
+      kategori: body.kategori,
+      lokasi: body.lokasi,
+      foto: body.foto || null,
+      deviceId: deviceId,
+    });
+
+    return NextResponse.json({ success: true, data: laporanBaru }, { status: 201 });
+  } catch (error: any) {
+    console.error("API Error:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  }
+}
+
+// HANDLE GET (INI YANG KITA PERBAIKI TOTAL)
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const status = searchParams.get("status"); // Ambil param ?status=...
+
+  try {
+    // Logic Admin: Ambil data sesuai status yang diminta dashboard
+    // Kita pakai prisma langsung biar bypass logic repository public
+    const data = await prisma.laporan.findMany({
+      where: status ? { status: status } : {}, // Kalau ada status, filter. Kalau gak, ambil semua.
+      orderBy: {
+        tanggal: 'desc' // Urutkan dari yang terbaru
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: data
+    });
+  } catch (error) {
+    return NextResponse.json({ success: false, data: [] });
   }
 }

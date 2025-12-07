@@ -1,42 +1,42 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifyToken } from "@/lib/auth"; // Helper yang kita buat di Batch 1
+import { verifyToken } from "@/lib/auth"; 
 
 export async function proxy(request: NextRequest) {
-  // 1. Ambil path yang dituju
   const path = request.nextUrl.pathname;
 
-  // 2. Tentukan area terlarang (Admin Panel & API Admin)
+  // Area Terlarang
   const isAdminRoute = path.startsWith("/admin/dashboard");
   const isAdminApi = path.startsWith("/api/admin") && !path.startsWith("/api/admin/login");
 
-  // 3. Jika bukan area admin, bebaskan
+  // Bebaskan jalur umum
   if (!isAdminRoute && !isAdminApi) {
     return NextResponse.next();
   }
 
-  // 4. Cek Cookie "access_token"
+  // Cek Token
   const token = request.cookies.get("access_token")?.value;
   
-  // Verifikasi Token
+  // Debugging (Akan muncul di Vercel Logs)
+  // console.log(`[Proxy] Akses ke: ${path}, Token ada? ${!!token}`);
+
   const verifiedToken = token ? await verifyToken(token) : null;
 
-  // 5. Logika Tolak/Terima
   if (!verifiedToken) {
-    // Jika akses API Admin tanpa token -> 401 Unauthorized
+    // Kalau token invalid/expired
     if (isAdminApi) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        // API Admin butuh JSON error
+        return NextResponse.json({ error: "Unauthorized: Token Invalid or Missing" }, { status: 401 });
     }
-    // Jika akses Dashboard tanpa token -> Redirect ke Login
     if (isAdminRoute) {
-      return NextResponse.redirect(new URL("/admin/login", request.url));
+        // Dashboard butuh Redirect
+        return NextResponse.redirect(new URL("/admin/login", request.url));
     }
   }
 
   return NextResponse.next();
 }
 
-// Konfigurasi: Middleware cuma jalan di path ini
 export const config = {
   matcher: ["/admin/:path*", "/api/admin/:path*"],
 };
