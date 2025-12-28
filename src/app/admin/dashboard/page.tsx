@@ -1,28 +1,28 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react"; // Tambah useCallback
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { 
   LayoutDashboard, CheckCircle, XCircle, 
-  LogOut, ShieldAlert, FileText, Check, X, Trash2, Search,
-  Eye, Filter, ChevronLeft, ChevronRight, Archive, Ban
+  LogOut, ShieldAlert, Check, X, 
+  Eye, Archive, Ban
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { formatDistanceToNow } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 
 type LaporanView = {
-  idLaporan: string;
+  id: string; 
   deskripsi: string;
   lokasi: string;
   kategori: string;
   foto: string | null;
   pelaporId: string;
   status: string;
-  tanggal: string;
-  jumlahLikes: number;
-  jumlahKomentar: number;
+  createdAt: string; 
+  likes: any[];
+  komentar: any[];
 };
 
 export default function AdminDashboard() {
@@ -33,37 +33,35 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedLaporan, setSelectedLaporan] = useState<LaporanView | null>(null);
 
-  // 1. Definisikan fetchData dengan useCallback agar stabil dan tidak re-render terus
   const fetchData = useCallback(async (tab: string) => {
     setIsLoading(true);
     
-    // MAPPING TAB KE STATUS DATABASE
+
     let dbStatus = "Pending";
-    if (tab === "Aktif") dbStatus = "Ditanggapi";
+    if (tab === "Aktif") dbStatus = "Ditanggapi"; 
     if (tab === "Selesai") dbStatus = "Selesai";
     if (tab === "Ditolak") dbStatus = "Ditolak";
     
     try {
       const res = await fetch(`/api/admin/laporan?status=${dbStatus}`, {
         cache: 'no-store',
-        headers: {
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
+        headers: { 'Pragma': 'no-cache' }
       });
       
       const json = await res.json();
-      if (json.success) setLaporanList(json.data);
-      else setLaporanList([]); 
+      if (json.success) {
+        setLaporanList(json.data);
+      } else {
+        setLaporanList([]); 
+      }
     } catch (e) {
       console.error(e);
       toast.error("Gagal mengambil data");
     } finally {
       setIsLoading(false);
     }
-  }, []); // Dependency array kosong karena tidak bergantung pada state luar yang berubah
+  }, []);
 
-  // 2. useEffect sekarang aman
   useEffect(() => {
     const token = localStorage.getItem("bisik_admin_token");
     const name = localStorage.getItem("bisik_admin_name");
@@ -74,27 +72,33 @@ export default function AdminDashboard() {
       setAdminName(name || "Admin");
       fetchData(activeTab);
     }
-  }, [activeTab, fetchData, router]); // Dependency lengkap
+  }, [activeTab, fetchData, router]);
 
   const handleModerasi = async (id: string, newStatus: string) => {
     const toastId = toast.loading("Memproses...");
     try {
-      await fetch("/api/admin/laporan", {
+      const res = await fetch("/api/admin/laporan", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status: newStatus }),
+        body: JSON.stringify({ id, status: newStatus }), 
       });
       
+      if (!res.ok) throw new Error("Gagal dari server");
+
       toast.success(`Status diubah: ${newStatus}`, { id: toastId });
       setSelectedLaporan(null); 
-      fetchData(activeTab); 
+      
+
+      setTimeout(() => {
+          fetchData(activeTab); 
+      }, 500);
+
     } catch (e) {
       toast.error("Gagal update", { id: toastId });
     }
   };
 
   const handleLogout = () => {
-    fetch("/api/admin/logout", { method: "POST" }); // Clear cookie
     localStorage.removeItem("bisik_admin_token");
     router.push("/admin/login");
   };
@@ -111,7 +115,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-[#09090B] font-sans flex text-gray-200">
       
-      {/* 1. SIDEBAR */}
+      {/* SIDEBAR */}
       <aside className="w-64 bg-[#18181B] hidden md:flex flex-col border-r border-gray-800 p-6 sticky top-0 h-screen z-20">
         <div className="flex items-center gap-3 mb-10 px-2">
            <Image src="/logo-kucing.png" alt="Logo" width={32} height={32} />
@@ -125,7 +129,6 @@ export default function AdminDashboard() {
           
           <button onClick={() => setActiveTab("Pending")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium border border-transparent ${activeTab === "Pending" ? "bg-purple-500/10 text-purple-400 border-purple-500/50" : "text-gray-400 hover:bg-white/5"}`}>
             <ShieldAlert className="w-5 h-5" /> Moderasi Masuk
-            {activeTab !== "Pending" && <span className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
           </button>
           
           <button onClick={() => setActiveTab("Aktif")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium border border-transparent ${activeTab === "Aktif" ? "bg-purple-500/10 text-purple-400 border-purple-500/50" : "text-gray-400 hover:bg-white/5"}`}>
@@ -146,7 +149,7 @@ export default function AdminDashboard() {
         <button onClick={handleLogout} className="flex items-center gap-2 text-red-400 hover:bg-red-500/10 px-4 py-2 rounded-lg transition text-sm font-bold"><LogOut className="w-4 h-4" /> Logout</button>
       </aside>
 
-      {/* 2. MAIN CONTENT */}
+      {/* MAIN CONTENT */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen w-full relative">
         <div className="flex justify-between items-center mb-8">
            <div>
@@ -189,20 +192,22 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="divide-y divide-gray-800">
                   {laporanList.map((item) => (
-                    <tr key={item.idLaporan} onClick={() => setSelectedLaporan(item)} className="hover:bg-white/5 transition cursor-pointer group">
+                    <tr key={item.id} onClick={() => setSelectedLaporan(item)} className="hover:bg-white/5 transition cursor-pointer group">
                       <td className="p-6">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-purple-400 font-bold text-xs border border-gray-700">
-                            {item.pelaporId.substring(0,2).toUpperCase()}
+                            {item.pelaporId ? item.pelaporId.substring(0,2).toUpperCase() : "??"}
                           </div>
                           <div>
-                            <p className="font-bold text-gray-200 text-sm">Guest-{item.pelaporId.substring(0,4)}</p>
+                            <p className="font-bold text-gray-200 text-sm">Guest-{item.pelaporId ? item.pelaporId.substring(0,4) : "Anon"}</p>
                           </div>
                         </div>
                       </td>
                       <td className="p-6 max-w-xs"><p className="text-sm text-gray-400 truncate">{item.deskripsi}</p></td>
                       <td className="p-6"><span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${getCategoryColor(item.kategori)}`}>{item.kategori}</span></td>
-                      <td className="p-6"><span className="text-sm text-gray-500 font-mono">{item.tanggal ? formatDistanceToNow(new Date(item.tanggal), { addSuffix: true, locale: idLocale }) : "-"}</span></td>
+                      <td className="p-6"><span className="text-sm text-gray-500 font-mono">
+                        {item.createdAt ? formatDistanceToNow(new Date(item.createdAt), { addSuffix: true, locale: idLocale }) : "-"}
+                      </span></td>
                       <td className="p-6 text-right"><button className="p-2 rounded-full hover:bg-purple-500/20 text-gray-500 hover:text-purple-400"><Eye className="w-5 h-5" /></button></td>
                     </tr>
                   ))}
@@ -213,7 +218,7 @@ export default function AdminDashboard() {
         </div>
       </main>
 
-      {/* MODAL DETAIL (Dengan Tombol Lengkap) */}
+      {/* MODAL DETAIL */}
       {selectedLaporan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-[#18181B] rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-gray-800">
@@ -228,30 +233,26 @@ export default function AdminDashboard() {
                {selectedLaporan.foto && <img src={selectedLaporan.foto} className="w-full h-auto rounded-xl border border-gray-800 mb-6" />}
             </div>
             
-            {/* FOOTER ACTIONS: KONTROL PENUH */}
             <div className="p-6 border-t border-gray-800 bg-[#18181B] flex justify-end gap-3 flex-wrap">
+               {}
                
-               {/* 1. Tombol Aktifkan (Jika belum aktif) */}
                {selectedLaporan.status !== "Ditanggapi" && (
-                 <button onClick={() => handleModerasi(selectedLaporan.idLaporan, "Ditanggapi")} className="px-4 py-2 rounded-xl bg-purple-600 text-white font-bold hover:bg-purple-500 flex items-center gap-2">
+                 <button onClick={() => handleModerasi(selectedLaporan.id, "Ditanggapi")} className="px-4 py-2 rounded-xl bg-purple-600 text-white font-bold hover:bg-purple-500 flex items-center gap-2">
                    <Check className="w-4 h-4" /> Posting (Aktif)
                  </button>
                )}
 
-               {/* 2. Tombol Selesai (Arsip) */}
                {selectedLaporan.status !== "Selesai" && (
-                 <button onClick={() => handleModerasi(selectedLaporan.idLaporan, "Selesai")} className="px-4 py-2 rounded-xl bg-green-600 text-white font-bold hover:bg-green-500 flex items-center gap-2">
+                 <button onClick={() => handleModerasi(selectedLaporan.id, "Selesai")} className="px-4 py-2 rounded-xl bg-green-600 text-white font-bold hover:bg-green-500 flex items-center gap-2">
                    <CheckCircle className="w-4 h-4" /> Tandai Selesai
                  </button>
                )}
 
-               {/* 3. Tombol Tolak/Hapus */}
                {selectedLaporan.status !== "Ditolak" && (
-                 <button onClick={() => handleModerasi(selectedLaporan.idLaporan, "Ditolak")} className="px-4 py-2 rounded-xl border border-red-900 text-red-500 font-bold hover:bg-red-900/20 flex items-center gap-2">
+                 <button onClick={() => handleModerasi(selectedLaporan.id, "Ditolak")} className="px-4 py-2 rounded-xl border border-red-900 text-red-500 font-bold hover:bg-red-900/20 flex items-center gap-2">
                    <XCircle className="w-4 h-4" /> Tolak / Take Down
                  </button>
                )}
-
             </div>
           </div>
         </div>
