@@ -11,6 +11,68 @@ const createLaporanUseCase = new CreateLaporanUseCase(laporanRepo, pelaporRepo);
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+//  GET
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const kategori = searchParams.get("kategori");
+
+  try {
+    const statusYangBolehMuncul = ["Aktif", "Ditanggapi", "Selesai"];
+
+    const whereClause: any = {
+      status: { in: statusYangBolehMuncul }
+    };
+
+    if (kategori) {
+      whereClause.kategori = kategori;
+    }
+
+    const data = await prisma.laporan.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        pelapor: true,
+        komentar: true,
+        likes: true
+      }
+    });
+
+    const formattedData = data.map(item => ({
+      idLaporan: item.id,     
+      
+      judul: item.judul,
+      deskripsi: item.deskripsi, 
+      kategori: item.kategori,
+      lokasi: item.lokasi,
+      foto: item.foto,          
+      
+      tanggal: item.createdAt,   
+      status: item.status,      
+      
+      jumlahLikes: item.likes.length,
+      jumlahKomentar: item.komentar.length,
+      
+      isLikedByMe: false,        
+      
+      pelapor: {
+        id: item.pelapor?.id || "anon",
+        avatar: "🐱",          
+        role: "Mahasiswa"
+      }
+    }));
+
+    return NextResponse.json({
+      success: true,
+      data: formattedData
+    });
+
+  } catch (error: any) {
+    console.error("Error GET Public:", error);
+    return NextResponse.json({ success: false, data: [] });
+  }
+}
+
+// POST
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -30,62 +92,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, data: laporanBaru }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 400 });
-  }
-}
-
-
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const kategori = searchParams.get("kategori");
-
-  try {
-  
-    const statusYangBolehMuncul = ["Aktif", "Ditanggapi", "Selesai"];
-
-    const whereClause: any = {
-      status: { in: statusYangBolehMuncul }
-    };
-
-    if (kategori) {
-      whereClause.kategori = kategori;
-    }
-
-    const data = await prisma.laporan.findMany({
-      where: whereClause,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        pelapor: true,  
-        komentar: true, 
-        likes: true    
-      }
-    });
-
-
-    const formattedData = data.map(item => ({
-      idLaporan: item.id,
-      judul: item.judul,
-      isi: item.deskripsi,
-      kategori: item.kategori,
-      lokasi: item.lokasi,
-      gambar: item.foto,
-      waktu: item.createdAt,
-      status: item.status, 
-      jumlahLikes: item.likes.length,
-      jumlahKomentar: item.komentar.length,
-      isLikedByMe: false, 
-      pelapor: {
-        avatar: "🐱", 
-       
-      }
-    }));
-
-    return NextResponse.json({
-      success: true,
-      data: formattedData
-    });
-
-  } catch (error: any) {
-    console.error("Error GET Public:", error);
-    return NextResponse.json({ success: false, data: [] });
   }
 }
